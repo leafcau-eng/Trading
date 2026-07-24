@@ -1,0 +1,15 @@
+{
+  "name": "ict-silver-bullet-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Decision-support engines untuk ICT Silver Bullet strategy. Lihat ict-rule-specification.md (single source of truth).",
+  "type": "module",
+  "scripts": {
+    "verify:time-engine": "tsx test/verify.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
