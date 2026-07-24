@@ -5,7 +5,8 @@
   "description": "Decision-support engines untuk ICT Silver Bullet strategy. Lihat ict-rule-specification.md (single source of truth).",
   "type": "module",
   "scripts": {
-    "verify:time-engine": "tsx test/verify.ts"
+    "verify:time-engine": "tsx test/verify.ts",
+    "verify:swing-detection": "tsx test/verify-swing-detection.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
