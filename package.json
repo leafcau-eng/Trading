@@ -7,7 +7,8 @@
   "scripts": {
     "verify:time-engine": "tsx test/verify.ts",
     "verify:swing-detection": "tsx test/verify-swing-detection.ts",
-    "verify:internal-structure": "tsx test/verify-internal-structure.ts"
+    "verify:internal-structure": "tsx test/verify-internal-structure.ts",
+    "verify:fvg": "tsx test/verify-fvg.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -60,6 +60,19 @@ export interface StructuralPoint {
 }
 
 /**
+ * Output FVG Detection Engine (Engine E), per spec section "Engine E".
+ */
+export interface FVG {
+  fvg_id: number;
+  type: 'bullish' | 'bearish';
+  gap_high: number;
+  gap_low: number;
+  formed_at_candle_index: number;
+  mitigation_status: 'ACTIVE' | 'MITIGATED';
+  mitigated_at_candle_index: number | null;
+}
+
+/**
  * BUKAN field yang eksplisit disebut spec Engine B sebagai output terpisah —
  * spec cuma nyebut field state per titik (broken_status/broken_at_candle_index).
  * Saya tambahin event stream ini karena BOS, CHOCH, MSS, DAN Order Block
