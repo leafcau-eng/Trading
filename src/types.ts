@@ -207,3 +207,28 @@ export interface StructureBreakEvent {
   /** v0.3.2: TrendState (BLOCKED), bukan Trend telanjang — lihat catatan di atas. */
   prior_trend: TrendState;
 }
+
+/**
+ * Output Rule #4 & #6 (BOS & CHOCH, unified), per spec section
+ * "4 & 6. BOS & CHOCH". `failure_reason` digabung ke objek yang sama
+ * (pola konsisten dengan LiquiditySweepResult/MSSResult).
+ *
+ * `TREND_BLOCKED` DITAMBAHIN di failure_reason -- BUKAN bagian literal
+ * spec (spec cuma punya NO_PRIOR_TREND/NO_STRUCTURE_BREAK/
+ * ENGINE_UNAVAILABLE). Dibutuhkan buat MEMBEDAKAN dua situasi yang beda
+ * makna tapi sama-sama "trend ranging" kalau dibaca mentah: (a)
+ * NO_PRIOR_TREND = trend ENGINE FUNGSIONAL, benar-benar menghitung
+ * ranging -- ini gak pernah kejadian saat ini. (b) TREND_BLOCKED = trend
+ * ENGINE gak fungsional (Engine B bagian e BLOCKED, literal_spec_value
+ * SELALU 'ranging' terlepas dari kondisi market sesungguhnya). Tanpa
+ * pembeda ini, membaca `literal_spec_value` langsung dan menganggapnya
+ * NO_PRIOR_TREND adalah PERSIS fallback/asumsi yang dilarang eksplisit.
+ */
+export interface BOSCHOCHResult {
+  status: 'VALID' | 'UNKNOWN';
+  event_type: 'BOS' | 'CHOCH' | null;
+  direction: 'bullish' | 'bearish' | null;
+  source_structure_id: number;
+  candle_index: number;
+  failure_reason: 'NO_PRIOR_TREND' | 'NO_STRUCTURE_BREAK' | 'ENGINE_UNAVAILABLE' | 'TREND_BLOCKED' | null;
+}

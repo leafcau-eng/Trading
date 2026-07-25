@@ -13,7 +13,8 @@
     "verify:order-block": "tsx test/verify-order-block.ts",
     "verify:session-engine": "tsx test/verify-session-engine.ts",
     "verify:liquidity-sweep": "tsx test/verify-liquidity-sweep.ts",
-    "verify:mss": "tsx test/verify-mss.ts"
+    "verify:mss": "tsx test/verify-mss.ts",
+    "verify:bos-choch": "tsx test/verify-bos-choch.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
