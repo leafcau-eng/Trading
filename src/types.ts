@@ -88,6 +88,80 @@ export interface IFVG {
 }
 
 /**
+ * Output Rule #3 (Liquidity Sweep), per spec section "3. Liquidity Sweep".
+ * `failure_reason` DITAMBAHIN di sini (bukan literal di Output block spec,
+ * yang misahin "Output" dan "Failure reason" jadi dua block terpisah) --
+ * satu shape gabungan ini yang dipakai implementasi, biar failure_reason
+ * ke-carry di objek yang sama, bukan hilang.
+ *
+ * `swept_side` JUGA DITAMBAHIN (gak ada di literal Output spec) -- ketauan
+ * pas bangun MSS (Rule #5), yang precondition-nya eksplisit butuh tau sisi
+ * mana yang ke-sweep ("sweep terjadi pada sisi low" utk bullish MSS). Buat
+ * target Engine B, sisi ini BISA diturunkan balik dari type milik point
+ * yang direferensikan swept_structure_id -- tapi buat target
+ * session_high_low, swept_structure_id null, gak ada jalan nurunin balik
+ * tanpa consumer ikut nyimpen session_high/low sendiri (persis pelanggaran
+ * "jangan hitung ulang fakta yang udah diketahui sumbernya"). Rule #3
+ * SUDAH TAU sisi ini di titik dia bikin objeknya -- diekspos langsung.
+ */
+export interface LiquiditySweepResult {
+  status: 'VALID' | 'INVALID' | 'UNKNOWN';
+  swept_target_type: 'session_high_low' | 'external_structure' | 'internal_structure';
+  swept_side: 'high' | 'low';
+  swept_structure_id: number | null;
+  swept_level_price: number;
+  sweep_candle_index: number;
+  failure_reason:
+    | 'TARGET_SOURCE_UNAVAILABLE'
+    | 'NO_ACTIVE_LEVEL'
+    | 'NO_SWEEP'
+    | 'NO_CLOSE_BACK'
+    | 'OUTSIDE_SESSION'
+    | null;
+}
+
+/**
+ * Output Rule #5 (MSS - Market Structure Shift), per spec section "5. MSS".
+ * `failure_reason` ditambahin (sama alasannya kayak LiquiditySweepResult).
+ */
+export interface MSSResult {
+  status: 'VALID' | 'INVALID' | 'UNKNOWN';
+  mss_direction: 'bullish' | 'bearish';
+  broken_structure_id: number;
+  mss_candle_index: number;
+  failure_reason: 'SWEEP_NOT_VALID' | 'NO_SUBSEQUENT_INTERNAL_BREAK' | 'ENGINE_UNAVAILABLE' | null;
+}
+
+/**
+ * Config Session Engine (Engine D). `session_windows` isinya kosong secara
+ * default -- WAJIB diisi eksplisit oleh caller, sama seperti swing_fractal_n.
+ * Asumsi implementasi (belum diverifikasi terhadap kasus overnight): window
+ * dianggap TIDAK melewati tengah malam (start <= end dalam sehari). Window
+ * yang overnight (mis. start="22:00", end="02:00") TIDAK didukung versi ini
+ * -- lihat catatan di sessionEngine.ts.
+ */
+export interface SessionWindow {
+  id: string;
+  start: string; // "HH:MM", NY local
+  end: string; // "HH:MM", NY local
+  timezone: string; // harus "America/New_York" per spec (selalu lewat Time Engine)
+  active: boolean;
+}
+
+/**
+ * Output Session Engine (Engine D) — bagian Session High/Low saja.
+ * `reference_levels` (termasuk midnight_open) BELUM diimplementasikan --
+ * di luar scope Rule #3, yang cuma butuh session_high/session_low.
+ */
+export interface SessionHighLow {
+  session_window_id: string;
+  ny_date: string;
+  session_high: number;
+  session_low: number;
+  status: 'IN_PROGRESS' | 'COMPLETE';
+}
+
+/**
  * Output Order Block Engine (Engine G), per spec section "Engine G".
  *
  * `lifecycle_status`/`mitigated_at_candle_index` sengaja tetap didefinisikan

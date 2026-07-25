@@ -10,7 +10,10 @@
     "verify:internal-structure": "tsx test/verify-internal-structure.ts",
     "verify:fvg": "tsx test/verify-fvg.ts",
     "verify:ifvg": "tsx test/verify-ifvg.ts",
-    "verify:order-block": "tsx test/verify-order-block.ts"
+    "verify:order-block": "tsx test/verify-order-block.ts",
+    "verify:session-engine": "tsx test/verify-session-engine.ts",
+    "verify:liquidity-sweep": "tsx test/verify-liquidity-sweep.ts",
+    "verify:mss": "tsx test/verify-mss.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
