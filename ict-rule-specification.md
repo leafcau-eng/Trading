@@ -1,5 +1,5 @@
 # ICT Rule Specification — Silver Bullet Strategy
-**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal).**
+**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal). KOREKSI v0.3.2: Engine B section (e) [Trend] terbukti kontradiktif secara matematis dengan section (c) — lihat section "Specification Conflict: Trend" (setelah Engine B). BLOCKED sampai direvisi; BOS/CHOCH ikut terdampak (lihat section yang sama).**
 
 Dokumen ini adalah single source of truth untuk implementasi bot decision-support Silver Bullet.
 
@@ -293,6 +293,48 @@ broken_at_candle_index: number | null
 
 ---
 
+## Specification Conflict: Trend (Engine B, bagian e) — BLOCKED
+**Status: BLOCKED v0.3.2 — kontradiksi internal terbukti matematis + dikonfirmasi empiris (1.400 candle, 3 random walk independen). Section (e) TIDAK BOLEH diimplementasikan/dipakai sampai direvisi. Ditemukan saat implementasi Engine B (TypeScript); keputusan didokumentasikan di sini atas instruksi eksplisit pemilik spec, bukan diperbaiki diam-diam.**
+
+### Kontradiksi
+
+**Lemma (CEH/CEL monoton):** Berdasar section (c), CEL (`current_external_low`) hanya bisa turun atau tetap, tidak pernah naik. Simetris, CEH cuma naik atau tetap.
+*Bukti:* titik pertama menetapkan CEL = harga sendiri (base case). Titik berikutnya: kalau EXTERNAL (syarat price < CEL lama), CEL baru = price < CEL lama (turun). Kalau INTERNAL, CEL tidak berubah. Induksi selesai.
+
+**Corollary:** Kapan pun, CEL_saat_ini ≤ harga SETIAP titik low yang pernah diproses sebelumnya — termasuk titik low immediately-preceding yang jadi acuan label di section (b).
+
+**Akibat:** Kalau titik low baru classified EXTERNAL (syarat: price < CEL_sebelum), maka per corollary, CEL_sebelum ≤ harga titik low sebelumnya manapun. Jadi price_baru < CEL_sebelum ≤ harga titik low sebelumnya — PASTI "lebih rendah". Per section (b), labelnya PASTI `LL`, TIDAK PERNAH `HL` (kecuali titik pertama → `UNLABELED`). Simetris: EXTERNAL high PASTI `HH`, TIDAK PERNAH `LH`.
+
+Section (e):
+- Bullish butuh: external swing low terakhir = `HL`
+- Bearish butuh: external swing high terakhir = `LH`
+
+Dua-duanya barusan dibuktikan mustahil buat titik EXTERNAL. **Bullish dan Bearish sama-sama unsatisfiable — bukan langka, betul-betul mustahil, untuk data harga apapun.** Trend literal sesuai (c)+(e) akan SELALU `RANGING`.
+
+**Verifikasi empiris:** 3 random walk independen (seed berbeda, total 1.400 candle, N=2 dan N=3) — trend tidak pernah keluar dari `ranging` di ketiganya, sepanjang seluruh run. Lihat `test/verify-internal-structure.ts`.
+
+### Dependency yang terdampak
+
+- **BOS & CHOCH** (section "4 & 6"): langkah pertama core definition minta trend sebelum `structure_break`. Trend selalu `ranging` → BOS/CHOCH selalu jatuh ke `status = UNKNOWN` (via `NO_ESTABLISHED_TREND`), tidak pernah `VALID`, berapa pun kondisi market. Praktis BLOCKED juga meski algoritmanya sendiri tidak berubah.
+- **MSS** (section 5): precondition tidak langsung baca `trend`, tapi kegunaan konseptualnya (menandai shift setelah sweep) berhubungan erat sama transisi trend yang tidak pernah valid. Perlu ditinjau ulang begitu trend direvisi.
+- **Order Block** (Engine G): berpotensi kena kalau filtering-nya nanti pakai `trend` — belum final, belum pasti.
+- Rule masa depan manapun yang membaca `trend`/`prior_trend` dari Internal Structure Engine.
+
+### Alternatif desain (didaftar, belum dipilih)
+
+1. Trend dari swing terakhir apapun classification-nya (label dari titik terakhir per axis, bukan cuma yang EXTERNAL) — match definisi textbook uptrend. *(Hipotesis Claude, belum diterapkan.)*
+2. Definisi EXTERNAL di section (c) diubah dulu (mis. window/lookback, bukan running max/min sepanjang waktu) supaya label EXTERNAL tidak selalu HH/LL — ini mengubah (c), bukan cuma (e).
+3. Trend dilepas dari Internal Structure Engine, jadi rule terpisah dengan akses data lebih kaya dari label swing saja.
+4. Kemungkinan lain yang belum terpikirkan — daftar ini tidak diklaim lengkap.
+
+Tidak satupun di atas diterapkan. Section (e) tetap seperti aslinya di atas, ditandai BLOCKED, menunggu keputusan pemilik spec.
+
+### Status implementasi kode
+
+`InternalStructureEngine` tetap menjalankan komputasi literal section (e) secara internal (buat referensi), tapi method publiknya (`getTrendState()`) mengembalikan status `BLOCKED` secara eksplisit — bukan mengembalikan `"ranging"` seolah itu nilai valid. `StructureBreakEvent.prior_trend` memakai wrapper yang sama.
+
+---
+
 ## Engine C. Time Engine
 **Status: FINAL — generik, minim ambiguitas.**
 
@@ -419,7 +461,7 @@ Section BOS dan CHOCH yang sebelumnya berdiri sendiri di titik ini (masing-masin
 ---
 
 ## 4 & 6. BOS (Break of Structure) & CHOCH (Change of Character)
-**Status: FINAL secara algoritma.**
+**Status: FINAL secara algoritma — tapi PRAKTIS BLOCKED v0.3.2: input `trend` dari Engine B section (e) BLOCKED (lihat "Specification Conflict: Trend" setelah Engine B). Selama trend belum direvisi, langkah 1 di bawah selalu jatuh ke `prior_trend = ranging`, jadi status yang dihasilkan selalu `UNKNOWN`, tidak pernah `VALID`.**
 
 **Catatan arsitektur:** BOS dan CHOCH ternyata dua output dari satu logika klasifikasi yang sama (bukan dua rule terpisah yang independen) — keduanya menjawab pertanyaan yang sama: "`structure_break` ini searah trend atau melawan trend?". BOS = searah (continuation), CHOCH = melawan (potensi reversal). Ditulis sebagai satu core logic di sini, tapi tetap dua entri terpisah di roadmap sesuai konvensi ICT.
 
