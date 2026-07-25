@@ -73,6 +73,21 @@ export interface FVG {
 }
 
 /**
+ * Output IFVG Engine (Engine F), per spec section "Engine F". Transformasi
+ * state dari FVG yang sudah MITIGATED -- bukan pattern baru dari candle.
+ */
+export interface IFVG {
+  ifvg_id: number;
+  source_fvg_id: number;
+  type: 'bullish' | 'bearish';
+  range_high: number;
+  range_low: number;
+  formed_at_candle_index: number;
+  lifecycle_status: 'ACTIVE' | 'USED';
+  used_at_candle_index: number | null;
+}
+
+/**
  * BUKAN field yang eksplisit disebut spec Engine B sebagai output terpisah —
  * spec cuma nyebut field state per titik (broken_status/broken_at_candle_index).
  * Saya tambahin event stream ini karena BOS, CHOCH, MSS, DAN Order Block
