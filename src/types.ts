@@ -88,6 +88,36 @@ export interface IFVG {
 }
 
 /**
+ * Output Order Block Engine (Engine G), per spec section "Engine G".
+ *
+ * `lifecycle_status`/`mitigated_at_candle_index` sengaja tetap didefinisikan
+ * FULL sesuai union yang tertulis di spec (bukan dipersempit ke cuma
+ * 'UNSPECIFIED'/null) walau implementasi saat ini CUMA PERNAH ngisi
+ * 'UNSPECIFIED'/null — biar begitu lifecycle (A/B/C) diputuskan, cukup isi
+ * logikanya di ObEngine, TANPA perlu ubah kontrak tipe ini lagi.
+ */
+export interface OrderBlock {
+  ob_id: number;
+  source_structure_break_candle_index: number;
+  type: 'bullish' | 'bearish';
+  zone_high: number;
+  zone_low: number;
+  formed_at_candle_index: number;
+  structure_scope_used: 'internal' | 'external';
+  /** UNSPECIFIED sampai lifecycle (touch/full-fill/body-close) diputuskan
+   *  pemilik spec — lihat TODO di orderBlockEngine.ts. */
+  lifecycle_status: 'ACTIVE' | 'MITIGATED' | 'UNSPECIFIED';
+  mitigated_at_candle_index: number | null;
+}
+
+/** Skip/failure sesuai spec Engine G. */
+export interface OrderBlockSkip {
+  status: 'SKIPPED';
+  reason: 'NO_OPPOSITE_CANDLE' | 'NO_STRUCTURE_BREAK' | 'ENGINE_UNAVAILABLE';
+  source_structure_break_candle_index: number;
+}
+
+/**
  * BUKAN field yang eksplisit disebut spec Engine B sebagai output terpisah —
  * spec cuma nyebut field state per titik (broken_status/broken_at_candle_index).
  * Saya tambahin event stream ini karena BOS, CHOCH, MSS, DAN Order Block
