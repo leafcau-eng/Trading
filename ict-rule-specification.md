@@ -1,5 +1,5 @@
 # ICT Rule Specification — Silver Bullet Strategy
-**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal). KOREKSI v0.3.2: Engine B section (e) [Trend] terbukti kontradiktif secara matematis dengan section (c) — lihat section "Specification Conflict: Trend" (setelah Engine B). BLOCKED sampai direvisi; BOS/CHOCH ikut terdampak (lihat section yang sama). KOREKSI v0.3.3: audit arsitektur menyeluruh (dependency graph acyclic, no duplicate logic, output consistency) setelah Rule #3/#5/#4&6 selesai diimplementasi — 1 duplikasi kode ditemukan & diperbaiki (`breakDirectionOf` dipindah ke Engine B, dipakai bersama Order Block & BOS/CHOCH), 2 gap dokumentasi ditutup (`swept_side` di Rule #3, `TREND_BLOCKED` di BOS/CHOCH — lihat masing-masing section). Tidak ada kontradiksi baru, tidak ada circular dependency.**
+**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal). KOREKSI v0.3.2: Engine B section (e) [Trend] terbukti kontradiktif secara matematis dengan section (c) — lihat section "Specification Conflict: Trend" (setelah Engine B). BLOCKED sampai direvisi; BOS/CHOCH ikut terdampak (lihat section yang sama). KOREKSI v0.3.3: audit arsitektur menyeluruh (dependency graph acyclic, no duplicate logic, output consistency) setelah Rule #3/#5/#4&6 selesai diimplementasi — 1 duplikasi kode ditemukan & diperbaiki (`breakDirectionOf` dipindah ke Engine B, dipakai bersama Order Block & BOS/CHOCH), 2 gap dokumentasi ditutup (`swept_side` di Rule #3, `TREND_BLOCKED` di BOS/CHOCH — lihat masing-masing section). Tidak ada kontradiksi baru, tidak ada circular dependency. KOREKSI v0.3.4: Engine G lifecycle diputuskan — B. Full Fill (dari 3 kandidat Touch/Full Fill/Body Close), reuse primitive full-fill yang sama dengan Engine E/F. Engine G sekarang FINAL sepenuhnya (identifikasi zona + lifecycle). Item #9 di roadmap diperbarui dari UNSPECIFIED.**
 
 Dokumen ini adalah single source of truth untuk implementasi bot decision-support Silver Bullet.
 
@@ -157,7 +157,7 @@ mss_candle_index: number       // = broken_at_candle_index dari Engine B
 ## 6. CHOCH — lihat section "4 & 6. BOS & CHOCH" di bawah (status FINAL, digabung dengan BOS)
 ## 7. FVG — lihat Engine E (direklasifikasi jadi Primitive sesuai prinsip Primitive→Composite)
 ## 8. IFVG — UNSPECIFIED
-## 9. Order Block — UNSPECIFIED
+## 9. Order Block — lihat Engine G di bawah (status FINAL, lifecycle Full Fill)
 ## 10. DRT — UNSPECIFIED, menunggu definisi operasional Anda
 ## 11. PD Array — UNSPECIFIED, menunggu definisi kategori mana yang Anda anggap valid
 ## 12. Entry Validation — bergantung 3-11
@@ -604,7 +604,7 @@ IFVG punya status sendiri: `ACTIVE` → `USED`. Trigger `USED` reuse geometri fu
 ---
 
 ## Engine G. Order Block
-**Status: SEBAGIAN — identifikasi zona OB FINAL. Satu detail lifecycle perlu konfirmasi (touch vs full-fill vs body close — 3 kandidat, lihat catatan di bawah), status UNSPECIFIED sampai dipilih.**
+**Status: FINAL v0.3.4 — identifikasi zona OB FINAL, lifecycle FINAL. Dari 3 kandidat (Touch/Full Fill/Body Close), pemilik spec memilih B. Full Fill — lihat detail di bawah.**
 
 **Definisi konseptual:**
 Order Block = candle terakhir berlawanan arah (opposite-color) sebelum leg impulsif yang berujung pada `structure_break`. Primitive engine — hanya identifikasi, lifecycle, dan fakta objektif. Tidak ada logika entry/scoring/confluence (itu tugas PD Array/Entry Validation).
@@ -625,12 +625,14 @@ Order Block = candle terakhir berlawanan arah (opposite-color) sebelum leg impul
    - `full_candle` → `[low, high]` candle OB
    - `body_only` → `[open, close]` candle OB (diurutkan low ke high)
 
-**Lifecycle: UNSPECIFIED — belum pernah diputuskan secara eksplisit.** Tiga kandidat:
-- **A. Touch** — `MITIGATED` begitu wick pertama kali menyentuh zona OB.
-- **B. Full Fill** — `MITIGATED` setelah seluruh zona OB terlewati harga (sama seperti definisi Engine E/F).
-- **C. Body Close** — `MITIGATED` setelah body candle close memenuhi kriteria tertentu (bukan sekadar wick).
+**Lifecycle: FINAL v0.3.4 — B. Full Fill dipilih pemilik spec.** Tiga kandidat yang sebelumnya dipertimbangkan (dipertahankan sebagai jejak keputusan):
+- ~~A. Touch — `MITIGATED` begitu wick pertama kali menyentuh zona OB.~~ (tidak dipilih)
+- **B. Full Fill — `MITIGATED` setelah seluruh zona OB terlewati harga (sama seperti definisi Engine E/F). DIPILIH.**
+- ~~C. Body Close — `MITIGATED` setelah body candle close memenuhi kriteria tertentu (bukan sekadar wick).~~ (tidak dipilih)
 
-Field `lifecycle_status` di output di bawah UNSPECIFIED sampai salah satu kandidat ini dipilih.
+**Core definition lifecycle (FINAL — reuse primitive full-fill yang sama dengan Engine E/F, bukan algoritma baru):** sejak candle SETELAH `formed_at_candle_index`, `ACTIVE` → `MITIGATED` begitu ADA candle (candle apapun, gak harus sama, gak harus berurutan) yang wick-nya mencakup sisi bawah zona (`low <= zone_low`) DAN ADA candle (bisa candle lain) yang wick-nya mencakup sisi atas zona (`high >= zone_high`). One-directional — sekali `MITIGATED`, tidak pernah balik `ACTIVE`. `mitigated_at_candle_index` = candle yang melengkapi sisi TERAKHIR yang belum tersentuh.
+
+Field `lifecycle_status` di output di bawah sekarang benar-benar terisi `ACTIVE`/`MITIGATED` (bukan `UNSPECIFIED` lagi).
 
 **Output:**
 ```
@@ -642,7 +644,7 @@ Field `lifecycle_status` di output di bawah UNSPECIFIED sampai salah satu kandid
   zone_low: number,
   formed_at_candle_index: number,   // index candle OB itu sendiri
   structure_scope_used: "internal" | "external",
-  lifecycle_status: "ACTIVE" | "MITIGATED" | UNSPECIFIED,   // pending pilihan A/B/C
+  lifecycle_status: "ACTIVE" | "MITIGATED",   // FINAL v0.3.4, Full Fill
   mitigated_at_candle_index: number | null
 }
 ```
