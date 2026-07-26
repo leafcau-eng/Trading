@@ -1,29 +1,31 @@
 /**
- * Engine G — Order Block (SEBAGIAN, sesuai instruksi eksplisit)
+ * Engine G — Order Block
  * Spec: ict-rule-specification.md, section "Engine G. Order Block"
- * Status spec: SEBAGIAN — identifikasi zona FINAL, lifecycle UNSPECIFIED.
- * Dependencies: Internal Structure Engine (Engine B) — sumber event
- * `structure_break`.
+ * Status spec: FINAL — identifikasi zona FINAL, lifecycle FINAL (Full Fill,
+ * kandidat B, diputuskan pemilik spec — lihat "Catatan keputusan lifecycle"
+ * di bawah). Dependencies: Internal Structure Engine (Engine B) — sumber
+ * event `structure_break`.
  *
- * DIIMPLEMENTASI (final, deterministik):
+ * DIIMPLEMENTASI LENGKAP:
  * - Identifikasi candle Order Block via backward scan dari structure_break
  * - Config `structure_scope` dan `ob_area` (gak ada default — wajib diisi
  *   eksplisit, sama seperti swing_fractal_n di Engine A)
  * - Zona OB (full_candle / body_only)
- * - Output schema lengkap
+ * - Lifecycle ACTIVE -> MITIGATED via Full Fill (kandidat B dari 3 opsi
+ *   spec: Touch/Full Fill/Body Close) -- REUSE primitive full-fill yang
+ *   PERSIS sama dengan Engine E (FVG) dan Engine F (IFVG): cumulative
+ *   coverage (bottomReached DAN topReached, dari candle manapun sejak
+ *   formasi, gak harus candle yang sama), bukan algoritma baru. Konsisten
+ *   sama prinsip "satu algoritma, satu sumber kebenaran" -- primitive
+ *   full-fill sudah ada, di sini cuma diterapkan ke zone Order Block.
+ * - Output schema lengkap, termasuk lifecycle_status & mitigated_at_candle_index
  * - Skip/failure reason NO_OPPOSITE_CANDLE
  *
- * SENGAJA BELUM DIIMPLEMENTASI (TODO, bukan diasumsikan):
- * - Lifecycle ACTIVE -> MITIGATED (3 kandidat belum diputuskan pemilik
- *   spec: A. Touch / B. Full Fill / C. Body Close — lihat "Lifecycle:
- *   UNSPECIFIED" di spec). `lifecycle_status` SELALU 'UNSPECIFIED',
- *   `mitigated_at_candle_index` SELALU null di implementasi ini.
- * - Mitigation logic apapun (gak ada tracking wick/body terhadap zone).
- * - Invalidation logic yang bergantung lifecycle.
- * Begitu lifecycle diputuskan: tambah tracking state (mirip pola
- * bottomReached/topReached di Engine E/F) dan isi TODO di ingestCandle()
- * di bawah — TIDAK perlu ubah OrderBlock type, constructor, atau cara
- * caller manggil engine ini.
+ * Catatan keputusan lifecycle: dari 3 kandidat (A. Touch / B. Full Fill /
+ * C. Body Close), pemilik spec memilih B. Full Fill secara eksplisit.
+ * TIDAK ada perubahan pada OrderBlock type, OrderBlockConfig, atau cara
+ * caller memanggil engine ini -- persis seperti yang direncanakan waktu
+ * bagian ini masih di-stub (lihat commit sebelumnya).
  */
 
 import type { Candle, OrderBlock, OrderBlockSkip, StructureBreakEvent } from './types';
@@ -36,6 +38,12 @@ export interface OrderBlockConfig {
 }
 
 type BreakDirection = 'up' | 'down';
+
+interface OrderBlockState {
+  ob: OrderBlock;
+  bottomReached: boolean; // ada candle (sejak formasi) yang low <= zone_low
+  topReached: boolean; // ada candle (sejak formasi) yang high >= zone_high
+}
 
 /**
  * [Menebak] Spec gak eksplisit nyebut kasus doji (close===open). Di sini
@@ -58,7 +66,7 @@ function matchesScope(classification: 'EXTERNAL' | 'INTERNAL', scope: OrderBlock
 export class OrderBlockEngine {
   private readonly candles: Candle[] = [];
   private obIdCounter = 0;
-  private readonly obs: OrderBlock[] = [];
+  private readonly obStates: OrderBlockState[] = [];
 
   constructor(private readonly config: OrderBlockConfig) {}
 
@@ -73,24 +81,36 @@ export class OrderBlockEngine {
    */
   ingestCandle(candle: Candle, structureBreaks: readonly StructureBreakEvent[]): (OrderBlock | OrderBlockSkip)[] {
     this.candles.push(candle);
+    const candleIndex = this.candles.length - 1;
     const results: (OrderBlock | OrderBlockSkip)[] = [];
 
+    // 1. Cek Full Fill buat OB yang SUDAH ADA (dari candle sebelumnya) DULU
+    //    -- urutan ini (cek dulu, baru tambah OB baru di langkah 2) yang
+    //    bikin OB yang baru kebentuk di candle ini gak langsung dicek
+    //    balik ke candle konfirmasinya sendiri. Pola sama persis dengan
+    //    Engine B/E/F/Rule#3/MSS/BOS-CHOCH.
+    for (const state of this.obStates) {
+      if (state.ob.lifecycle_status === 'MITIGATED') continue;
+      if (candle.low <= state.ob.zone_low) state.bottomReached = true;
+      if (candle.high >= state.ob.zone_high) state.topReached = true;
+      if (state.bottomReached && state.topReached) {
+        state.ob.lifecycle_status = 'MITIGATED';
+        state.ob.mitigated_at_candle_index = candleIndex;
+        results.push(state.ob);
+      }
+    }
+
+    // 2. Identifikasi OB baru dari structure_break candle ini (ditambah
+    //    SETELAH pengecekan di atas -- lihat penjelasan di langkah 1)
     for (const breakEvent of structureBreaks) {
       if (!matchesScope(breakEvent.classification, this.config.structureScope)) continue;
 
       const result = this.identifyOrderBlock(breakEvent);
       results.push(result);
-      if ('ob_id' in result) this.obs.push(result);
+      if ('ob_id' in result) {
+        this.obStates.push({ ob: result, bottomReached: false, topReached: false });
+      }
     }
-
-    // TODO (lifecycle UNSPECIFIED — jangan isi sebelum pemilik spec
-    // memutuskan A/B/C): begitu diputuskan, loop di sini buat cek OB yang
-    // masih ACTIVE terhadap `candle` (wick/body sesuai kandidat terpilih),
-    // set lifecycle_status='MITIGATED' + mitigated_at_candle_index, push
-    // ke `results`. Pola persis sama dengan bottomReached/topReached di
-    // FVGEngine/IFVGEngine (lihat fvgEngine.ts, ifvgEngine.ts) — TIDAK
-    // perlu algoritma baru, tinggal terapin primitive yang sudah ada ke
-    // kandidat yang dipilih.
 
     return results;
   }
@@ -133,13 +153,13 @@ export class OrderBlockEngine {
       zone_low,
       formed_at_candle_index: obCandleIndex,
       structure_scope_used: breakEvent.classification === 'INTERNAL' ? 'internal' : 'external',
-      lifecycle_status: 'UNSPECIFIED',
+      lifecycle_status: 'ACTIVE',
       mitigated_at_candle_index: null,
     };
   }
 
   getOrderBlocks(): readonly OrderBlock[] {
-    return this.obs;
+    return this.obStates.map((s) => s.ob);
   }
 }
 

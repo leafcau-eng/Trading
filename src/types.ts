@@ -164,11 +164,12 @@ export interface SessionHighLow {
 /**
  * Output Order Block Engine (Engine G), per spec section "Engine G".
  *
- * `lifecycle_status`/`mitigated_at_candle_index` sengaja tetap didefinisikan
- * FULL sesuai union yang tertulis di spec (bukan dipersempit ke cuma
- * 'UNSPECIFIED'/null) walau implementasi saat ini CUMA PERNAH ngisi
- * 'UNSPECIFIED'/null — biar begitu lifecycle (A/B/C) diputuskan, cukup isi
- * logikanya di ObEngine, TANPA perlu ubah kontrak tipe ini lagi.
+ * `lifecycle_status`: kandidat B (Full Fill) dipilih pemilik spec dan
+ * diimplementasikan -- reuse primitive full-fill yang sama dengan Engine
+ * E/F (cumulative bottomReached+topReached), bukan algoritma baru. Union
+ * tipe tetap mencantumkan 'UNSPECIFIED' buat konsistensi historis dengan
+ * spec (nilai itu gak lagi pernah keluar dari implementasi saat ini,
+ * lifecycle sudah FINAL).
  */
 export interface OrderBlock {
   ob_id: number;
@@ -178,8 +179,9 @@ export interface OrderBlock {
   zone_low: number;
   formed_at_candle_index: number;
   structure_scope_used: 'internal' | 'external';
-  /** UNSPECIFIED sampai lifecycle (touch/full-fill/body-close) diputuskan
-   *  pemilik spec — lihat TODO di orderBlockEngine.ts. */
+  /** FINAL v0.3.4 — Full Fill (kandidat B), diimplementasikan di
+   *  orderBlockEngine.ts. 'UNSPECIFIED' dipertahankan di union tipe buat
+   *  jejak historis, gak lagi pernah keluar dari implementasi ini. */
   lifecycle_status: 'ACTIVE' | 'MITIGATED' | 'UNSPECIFIED';
   mitigated_at_candle_index: number | null;
 }
