@@ -1,5 +1,5 @@
 # ICT Rule Specification — Silver Bullet Strategy
-**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal). KOREKSI v0.3.2: Engine B section (e) [Trend] terbukti kontradiktif secara matematis dengan section (c) — lihat section "Specification Conflict: Trend" (setelah Engine B). BLOCKED sampai direvisi; BOS/CHOCH ikut terdampak (lihat section yang sama).**
+**Status: v0.3.1 — Roadmap direstrukturisasi. Rule #1 & #2 DOWNGRADE ke BLOCKED (bergantung engine yang belum ada) — histori v0.3, dipertahankan. KOREKSI v0.3.1: Rule #1 (Session Engine) & #2 (Swing Detection Engine) TIDAK lagi BLOCKED — keduanya sudah FINAL/ALMOST FINAL sebagai Engine D & Engine A (lihat section masing-masing). BOS/CHOCH juga dikonsolidasi jadi satu section unified di v0.3.1; dua section standalone versi lama dihapus (jejaknya ditinggal sebagai catatan di lokasi asal). KOREKSI v0.3.2: Engine B section (e) [Trend] terbukti kontradiktif secara matematis dengan section (c) — lihat section "Specification Conflict: Trend" (setelah Engine B). BLOCKED sampai direvisi; BOS/CHOCH ikut terdampak (lihat section yang sama). KOREKSI v0.3.3: audit arsitektur menyeluruh (dependency graph acyclic, no duplicate logic, output consistency) setelah Rule #3/#5/#4&6 selesai diimplementasi — 1 duplikasi kode ditemukan & diperbaiki (`breakDirectionOf` dipindah ke Engine B, dipakai bersama Order Block & BOS/CHOCH), 2 gap dokumentasi ditutup (`swept_side` di Rule #3, `TREND_BLOCKED` di BOS/CHOCH — lihat masing-masing section). Tidak ada kontradiksi baru, tidak ada circular dependency.**
 
 Dokumen ini adalah single source of truth untuk implementasi bot decision-support Silver Bullet.
 
@@ -93,17 +93,22 @@ Jika 1–3 terpenuhi → `status = VALID`.
 ```
 status: VALID | INVALID | UNKNOWN
 swept_target_type: "session_high_low" | "external_structure" | "internal_structure"
+swept_side: "high" | "low"   // [Ditambahkan saat implementasi Rule #5/MSS — lihat catatan]
 swept_structure_id: number | null   // hanya terisi kalau target dari Engine B
 swept_level_price: number
 sweep_candle_index: number
 ```
+
+**Catatan implementasi (v0.3.2):** `swept_side` awalnya tidak ada di Output. Ketauan wajib ada saat implementasi MSS (Rule #5) — precondition MSS eksplisit butuh tau sisi mana yang di-sweep ("sweep terjadi pada sisi low" utk bullish MSS), dan tanpa field ini, target `session_high_low` (swept_structure_id-nya null) gak punya cara direct buat consumer nurunin sisi itu tanpa consumer ikut menghitung ulang sendiri. Ditambah di sini, bukan ditambal di MSS.
 
 **Failure reason:**
 - `TARGET_SOURCE_UNAVAILABLE` — Session Engine belum ready, atau `sweep_target_session_window` belum ada occurrence `COMPLETE` → `status = UNKNOWN`
 - `NO_ACTIVE_LEVEL` — tidak ada level ACTIVE untuk dievaluasi
 - `NO_SWEEP` — tidak ada wick yang menembus level
 - `NO_CLOSE_BACK` — wick menembus tapi body tidak close kembali (atau malah jadi `structure_break` sungguhan, bukan sweep)
-- `OUTSIDE_SESSION` — di luar Silver Bullet Window
+- `OUTSIDE_SESSION` — di luar Silver Bullet Window (belum ada mekanisme config yang mendefinisikan ini — lihat catatan)
+
+**Catatan implementasi (v0.3.2) — `OUTSIDE_SESSION`:** section Config di atas cuma punya `sweep_target` dan `sweep_target_session_window` — gak ada parameter yang mendefinisikan "evaluasi cuma dalam window X". Failure reason ini ada di daftar tapi implementasi saat ini TIDAK PERNAH menghasilkannya, karena mekanismenya belum didefinisikan di sini. Bukan diasumsikan/diisi sendiri — dicatat sebagai gap terbuka.
 
 **Quality filter (UNSPECIFIED, tidak berubah):**
 - `retrace_min_pct`, `max_candle_confirm` — bukan bagian core, dikalibrasi pasca-backtest
@@ -504,6 +509,9 @@ Untuk tiap event `structure_break` yang classification-nya sesuai `structure_sco
 - `NO_PRIOR_TREND` — `prior_trend = ranging`, tidak bisa diklasifikasi BOS/CHOCH → `status = UNKNOWN`
 - `NO_STRUCTURE_BREAK` — tidak ada event `structure_break` untuk classification yang dipilih
 - `ENGINE_UNAVAILABLE` — Internal Structure Engine belum ready
+- `TREND_BLOCKED` — [Ditambahkan v0.3.2] Trend (bagian e) BLOCKED, lihat "Specification Conflict: Trend". BEDA dari `NO_PRIOR_TREND`: itu berarti trend engine fungsional dan BENERAN menghitung ranging; `TREND_BLOCKED` berarti trend engine-nya sendiri gak fungsional (`literal_spec_value` SELALU 'ranging' terlepas kondisi market). Membaca `literal_spec_value` mentah lalu menganggapnya `NO_PRIOR_TREND` akan MENYAMARKAN kegagalan sebagai hasil valid — itu sebabnya reason terpisah ini dibutuhkan, bukan didaftar semula.
+
+**Catatan implementasi (v0.3.2):** selama Trend BLOCKED, SEMUA evaluasi BOS/CHOCH (untuk classification EXTERNAL manapun) akan `status=UNKNOWN, failure_reason=TREND_BLOCKED` — dikonfirmasi empiris (58 evaluasi, 3 random walk independen). `NO_PRIOR_TREND` secara struktural tidak pernah terpicu saat ini, disiapkan buat begitu Trend direvisi.
 
 **Edge case belum diputuskan — trend RANGING saat break external pertama terjadi:**
 Behavior saat ini (`status = UNKNOWN` saat `prior_trend = ranging`) adalah default aman, bukan keputusan final. Pertanyaan yang belum dijawab: kalau belum ada trend established dan tiba-tiba ada `structure_break` external, apakah break itu otomatis dianggap BOS (trend baru langsung terbentuk, lebih responsif) atau tetap `UNKNOWN` sampai ada konfirmasi break kedua searah (lebih konservatif, mengurangi false signal di market choppy)? Ini keputusan Anda, bukan diasumsikan di sini — dampaknya ke seberapa cepat sistem "percaya" pada trend baru yang baru mulai terbentuk.
