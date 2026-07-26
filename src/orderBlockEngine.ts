@@ -28,7 +28,7 @@
 
 import type { Candle, OrderBlock, OrderBlockSkip, StructureBreakEvent } from './types';
 import { SwingDetectionEngine } from './swingDetectionEngine';
-import { InternalStructureEngine } from './internalStructureEngine';
+import { InternalStructureEngine, breakDirectionOf } from './internalStructureEngine';
 
 export interface OrderBlockConfig {
   structureScope: 'internal' | 'external' | 'both';
@@ -36,12 +36,6 @@ export interface OrderBlockConfig {
 }
 
 type BreakDirection = 'up' | 'down';
-
-function breakDirectionOf(event: StructureBreakEvent): BreakDirection {
-  // Structure HIGH pecah -> close di atas level -> break ke ATAS (up).
-  // Structure LOW pecah -> close di bawah level -> break ke BAWAH (down).
-  return event.type === 'high' ? 'up' : 'down';
-}
 
 /**
  * [Menebak] Spec gak eksplisit nyebut kasus doji (close===open). Di sini

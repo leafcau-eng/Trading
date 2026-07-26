@@ -36,6 +36,21 @@ const TREND_BLOCKED_REASON =
   'Conflict: Trend" di ict-rule-specification.md. Trend TIDAK BOLEH ' +
   'dikonsumsi sampai spec direvisi oleh pemilik spec.';
 
+/**
+ * DITAMBAHIN saat audit arsitektur (bukan bagian asli implementasi Engine
+ * B) -- ditemukan Order Block DAN BOS/CHOCH masing-masing nulis ulang
+ * mapping identik ini (`type==='high' ? 'up' : 'down'`) secara independen.
+ * Dipindah ke sini karena ini murni interpretasi field `type` milik
+ * StructureBreakEvent -- Engine B (sumber field itu) adalah tempat yang
+ * benar buat jadi single source of truth-nya, bukan didefinisikan ulang
+ * di tiap consumer.
+ */
+export function breakDirectionOf(breakEvent: StructureBreakEvent): 'up' | 'down' {
+  // Structure HIGH pecah -> close di atas level -> break ke ATAS (up).
+  // Structure LOW pecah -> close di bawah level -> break ke BAWAH (down).
+  return breakEvent.type === 'high' ? 'up' : 'down';
+}
+
 export class InternalStructureEngine {
   private candleCount = 0;
   private structureIdCounter = 0;

@@ -38,6 +38,7 @@
  */
 
 import type { BOSCHOCHResult, StructureBreakEvent, TrendState } from './types';
+import { breakDirectionOf } from './internalStructureEngine';
 
 type BreakDirection = 'up' | 'down';
 
@@ -92,7 +93,7 @@ export class BOSCHOCHEngine {
     for (const breakEvent of structureBreaksThisCandle) {
       if (breakEvent.classification !== 'EXTERNAL') continue; // structure_scope FINAL, INTERNAL = domain MSS
 
-      const breakDirection: BreakDirection = breakEvent.type === 'high' ? 'up' : 'down';
+      const breakDirection = breakDirectionOf(breakEvent);
 
       if (priorTrend.status === 'BLOCKED') {
         // Lihat catatan file-level: TIDAK membaca literal_spec_value di
